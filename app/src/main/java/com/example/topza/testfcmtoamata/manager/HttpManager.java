@@ -1,6 +1,6 @@
 package com.example.topza.testfcmtoamata.manager;
 
-import com.example.topza.testfcmtoamata.dao.BoardResponseDao;
+import com.example.topza.testfcmtoamata.dao.BoardDao;
 
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
@@ -40,7 +40,7 @@ public class HttpManager {
 
     public interface ApiService {
         @GET("board/{user_id}")
-        Observable<BoardResponseDao> getBoard(@Header("Authorization") String authHeader, @Path("user_id") int userId);
+        Observable<BoardDao> getBoard(@Header("Authorization") String authHeader, @Path("user_id") int userId);
     }
 
 }

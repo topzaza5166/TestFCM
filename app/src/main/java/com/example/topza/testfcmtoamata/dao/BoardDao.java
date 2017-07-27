@@ -1,36 +1,43 @@
+
 package com.example.topza.testfcmtoamata.dao;
 
-import android.os.Parcel;
-import android.os.Parcelable;
+import com.google.gson.annotations.Expose;
+import com.google.gson.annotations.SerializedName;
 
-/**
- * Created by topza on 7/27/2017.
- */
+public class BoardDao {
 
-public class BoardDao implements Parcelable {
+    @SerializedName("response")
+    @Expose
+    private Integer response;
+    @SerializedName("message")
+    @Expose
+    private String message;
+    @SerializedName("data")
+    @Expose
+    private Data data;
 
-
-    protected BoardDao(Parcel in) {
+    public Integer getResponse() {
+        return response;
     }
 
-    public static final Creator<BoardDao> CREATOR = new Creator<BoardDao>() {
-        @Override
-        public BoardDao createFromParcel(Parcel in) {
-            return new BoardDao(in);
-        }
-
-        @Override
-        public BoardDao[] newArray(int size) {
-            return new BoardDao[size];
-        }
-    };
-
-    @Override
-    public int describeContents() {
-        return 0;
+    public void setResponse(Integer response) {
+        this.response = response;
     }
 
-    @Override
-    public void writeToParcel(Parcel dest, int flags) {
+    public String getMessage() {
+        return message;
     }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public Data getData() {
+        return data;
+    }
+
+    public void setData(Data data) {
+        this.data = data;
+    }
+
 }
