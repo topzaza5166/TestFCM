@@ -4,10 +4,10 @@ import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.databinding.DataBindingUtil;
-import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Base64;
@@ -26,9 +26,13 @@ import com.example.topza.testfcmtoamata.manager.NotificationManager;
 import com.example.topza.testfcmtoamata.view.SpinnerView;
 import com.github.oliveiradev.lib.RxPhoto;
 import com.github.oliveiradev.lib.shared.TypeRequest;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
 import com.yalantis.ucrop.UCrop;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -45,7 +49,7 @@ import rx.subscriptions.Subscriptions;
 public class MainActivity extends AppCompatActivity {
     private static final int RESPONSE_CODE_SUCCESS = 200;
     private static final String RESPONSE_MESSAGE_SUCCESS = "Success";
-    private static final String RESPONSE = "response";
+    private static final String TAG = "main_activity";
 
     // Variable
 
@@ -53,7 +57,11 @@ public class MainActivity extends AppCompatActivity {
 
     private customSpinnerAdapter spinnerAdapter;
     private Uri resultUri = null;
+    private Uri downloadUrl = null;
     private Subscription subscription = Subscriptions.empty();
+    private UploadTask uploadTask;
+    private ProgressDialog dialog;
+    private Observable<String> notificationObservable = Observable.empty();
 
     /*****************
      * Functions
@@ -67,42 +75,29 @@ public class MainActivity extends AppCompatActivity {
         getBoardList();
 
         binding.buttonSend.setOnClickListener(listener);
-
-        binding.imageView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                builder.setTitle("Choose from...")
-                        .setItems(R.array.choose_image_item, new DialogInterface.OnClickListener() {
-                            @Override
-                            public void onClick(DialogInterface dialog, int which) {
-                                if (which == 0) {
-                                    subscription = RxPhoto.requestUri(MainActivity.this, TypeRequest.CAMERA)
-                                            .observeOn(AndroidSchedulers.mainThread())
-                                            .doOnNext(uriAction)
-                                            .subscribe();
-                                } else if (which == 1) {
-                                    subscription = RxPhoto.requestUri(MainActivity.this, TypeRequest.GALLERY)
-                                            .observeOn(AndroidSchedulers.mainThread())
-                                            .doOnNext(uriAction)
-                                            .subscribe();
-                                }
-                            }
-                        }).show();
-            }
-        });
+        binding.imageView.setOnClickListener(chooseImage);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK && requestCode == UCrop.REQUEST_CROP) {
-            resultUri = UCrop.getOutput(data);
-            binding.imageView.setImageURI(resultUri);
-            subscription.unsubscribe();
-        } else if (resultCode == UCrop.RESULT_ERROR) {
-            Log.d("Crop Error", UCrop.getError(data).getMessage());
+        if (requestCode == UCrop.REQUEST_CROP) {
+            if (resultCode == RESULT_OK) {
+                resultUri = UCrop.getOutput(data);
+                binding.imageView.setImageURI(resultUri);
+            } else if (resultCode == UCrop.RESULT_ERROR) {
+                Log.d(TAG, "Crop Error : " + UCrop.getError(data).getMessage());
+            }
         }
+
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+
+        if (subscription != null && !subscription.isUnsubscribed())
+            subscription.unsubscribe();
     }
 
     @Override
@@ -116,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
 
-        if (savedInstanceState != null){
+        if (savedInstanceState != null) {
             resultUri = savedInstanceState.getParcelable("imageUri");
             binding.imageView.setImageURI(resultUri);
         }
@@ -130,13 +125,37 @@ public class MainActivity extends AppCompatActivity {
         observable.subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .unsubscribeOn(Schedulers.io())
-                .subscribe(subscriber);
+                .subscribe(new Subscriber<BoardDao>() {
+                    @Override
+                    public void onCompleted() {
+                        binding.spinnerTopic.setAdapter(spinnerAdapter);
+                        Log.d(TAG, "Load Spinner Complete");
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        Toast.makeText(MainActivity.this, "Load Fail", Toast.LENGTH_SHORT).show();
+                        Log.d(TAG, "BoardDao error" + e.getMessage());
+                    }
+
+                    @Override
+                    public void onNext(BoardDao boardDao) {
+                        if (boardDao.getResponse() == RESPONSE_CODE_SUCCESS && boardDao.getMessage().equals(RESPONSE_MESSAGE_SUCCESS)) {
+                            if (boardDao.getData().getBoardThreads() != null) {
+                                spinnerAdapter = new customSpinnerAdapter(boardDao);
+                                Log.d(TAG, "Board is not Null");
+                            }
+                            Log.d(TAG, "Connection Complete");
+                        } else Log.d(TAG, boardDao.getResponse() + boardDao.getMessage());
+                    }
+                });
     }
 
     private NotificationManager.JsonBody getJsonBody() {
         NotificationManager.JsonBody jsonBody = new NotificationManager.JsonBody();
-        String topic = "board_" + ((BoardThread) binding.spinnerTopic.getSelectedItem()).getTitle();
-        topic.replace(" ", "_");
+        BoardThread board = (BoardThread) binding.spinnerTopic.getSelectedItem();
+        String topic = "board_" + board.getTitle().replace(" ", "_").toLowerCase();
+        Log.d(TAG, "Topic is " + topic);
         jsonBody.setTopic(topic);
 
         String title = binding.editTitle.getText().toString();
@@ -145,20 +164,30 @@ public class MainActivity extends AppCompatActivity {
         String message = binding.editMessage.getText().toString();
         jsonBody.setText(message);
 
-//        if (binding.imageView.getDrawable() != null) {
-//            Bitmap bitmap = ((BitmapDrawable) binding.imageView.getDrawable()).getBitmap();
-//            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-//            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
-//            byte[] imageInByte = baos.toByteArray();
-//            jsonBody.setData(imageInByte);
-//        }
-
-        if (resultUri != null) {
-            File file = new File(resultUri.getPath());
-            jsonBody.setData(file);
-        }
+        if (downloadUrl != null)
+            jsonBody.setData(downloadUrl.toString());
 
         return jsonBody;
+    }
+
+    private void uploadImage() {
+        FirebaseStorage storage = FirebaseStorage.getInstance();
+        StorageReference storageRef = storage.getReference().child("image/" + resultUri.getLastPathSegment());
+        uploadTask = storageRef.putFile(resultUri);
+        uploadTask.addOnFailureListener(new OnFailureListener() {
+            @Override
+            public void onFailure(@NonNull Exception e) {
+                dialog.cancel();
+                Log.d(TAG, "Upload Error : " + e.getMessage());
+            }
+        }).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+            @Override
+            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                downloadUrl = taskSnapshot.getDownloadUrl();
+                notificationObservable.subscribe();
+                Log.d(TAG, "Upload Success Uri : " + downloadUrl.toString());
+            }
+        });
     }
 
     /********************
@@ -172,40 +201,16 @@ public class MainActivity extends AppCompatActivity {
             String currentDateandTime = sdf.format(new Date());
             UCrop.of(uri, Uri.fromFile(new File(getCacheDir(), currentDateandTime + ".jpg")))
                     .withAspectRatio(1, 1)
+                    .withMaxResultSize(360, 360)
                     .start(MainActivity.this);
-        }
-    };
-
-    Subscriber<BoardDao> subscriber = new Subscriber<BoardDao>() {
-        @Override
-        public void onCompleted() {
-            binding.spinnerTopic.setAdapter(spinnerAdapter);
-            Log.d(RESPONSE, "Load Spinner Complete");
-        }
-
-        @Override
-        public void onError(Throwable e) {
-            Toast.makeText(MainActivity.this, "Load Fail", Toast.LENGTH_SHORT).show();
-            Log.d(RESPONSE, e.getMessage());
-        }
-
-        @Override
-        public void onNext(BoardDao boardDao) {
-            if (boardDao.getResponse() == RESPONSE_CODE_SUCCESS && boardDao.getMessage().equals(RESPONSE_MESSAGE_SUCCESS)) {
-                if (boardDao.getData().getBoardThreads() != null) {
-                    spinnerAdapter = new customSpinnerAdapter(boardDao);
-                    Log.d(RESPONSE, "Board is not Null");
-                }
-                Log.d(RESPONSE, "Connection Complete");
-            } else Log.d(RESPONSE, boardDao.getResponse() + boardDao.getMessage());
         }
     };
 
     View.OnClickListener listener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            final ProgressDialog dialog = ProgressDialog.show(MainActivity.this, "", "Please Wait", true, false);
-            Observable.fromCallable(new Callable<String>() {
+            dialog = ProgressDialog.show(MainActivity.this, "", "Please Wait", true, false);
+            notificationObservable = Observable.fromCallable(new Callable<String>() {
                 @Override
                 public String call() throws Exception {
                     return NotificationManager.pushNotification(getJsonBody());
@@ -213,25 +218,43 @@ public class MainActivity extends AppCompatActivity {
             }).subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
                     .unsubscribeOn(Schedulers.io())
-                    .subscribe(new Subscriber<String>() {
+                    .doOnNext(new Action1<String>() {
                         @Override
-                        public void onCompleted() {
-
-                        }
-
-                        @Override
-                        public void onError(Throwable e) {
-                            e.printStackTrace();
-                            dialog.cancel();
-                            Log.d("Send Notification Error", e.getMessage());
-                        }
-
-                        @Override
-                        public void onNext(String s) {
+                        public void call(String s) {
                             Toast.makeText(MainActivity.this, s, Toast.LENGTH_SHORT).show();
                             dialog.cancel();
+                            Log.d(TAG, "Send Notification Completed");
+                        }
+                    }).doOnError(new Action1<Throwable>() {
+                        @Override
+                        public void call(Throwable throwable) {
+                            dialog.cancel();
+                            Log.d(TAG, "Send Notification Error" + throwable.getMessage());
                         }
                     });
+
+            if (resultUri != null)
+                uploadImage();
+            else notificationObservable.subscribe();
+        }
+    };
+
+    View.OnClickListener chooseImage = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+            builder.setTitle("Choose from...")
+                    .setItems(R.array.choose_image_item, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            subscription.unsubscribe();
+                            subscription = RxPhoto.requestUri(MainActivity.this,
+                                    which == 0 ? TypeRequest.CAMERA : TypeRequest.GALLERY)
+                                    .observeOn(AndroidSchedulers.mainThread())
+                                    .doOnNext(uriAction)
+                                    .subscribe();
+                        }
+                    }).show();
         }
     };
 

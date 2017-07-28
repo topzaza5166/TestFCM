@@ -1,0 +1,73 @@
+{
+  "project_info": {
+    "project_number": "517414889765",
+    "firebase_url": "https://amatasmartcity-3fb82.firebaseio.com",
+    "project_id": "amatasmartcity-3fb82",
+    "storage_bucket": "amatasmartcity-3fb82.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:517414889765:android:2c18dd06ce247eee",
+        "android_client_info": {
+          "package_name": "com.amata.smartcity.amatasmartcity"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "517414889765-0ibgmk69f3humrb3vics5c2p83nhddpr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAG6pk8RYbUwXLXCYjDAMijlK03DRKJcVU"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:517414889765:android:a7c5042552e8c354",
+        "android_client_info": {
+          "package_name": "com.example.topza.testfcmtoamata"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "517414889765-0ibgmk69f3humrb3vics5c2p83nhddpr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAG6pk8RYbUwXLXCYjDAMijlK03DRKJcVU"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

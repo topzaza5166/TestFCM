@@ -1,5 +1,7 @@
 package com.example.topza.testfcmtoamata.manager;
 
+import android.util.Log;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -18,6 +20,7 @@ import java.util.Scanner;
 public class NotificationManager {
 
     private static final String AUTH_KEY = "key=AAAAeHhUqSU:APA91bFeajqq_ilkOhXA1RjJNd3DIj7t4CdALH4VWVkxeT_SkHhUsbQp-8t8z-g5r0-Jy3VNP-exaXn8-XHT9d_r-pnbUTfKQYRj_500Ib3TLU1YfAOEmz3BLuS9LJiC1k8u-uU-v4sh";
+    private static final String TAG = "notification_manager";
 
     public static String pushNotification(JsonBody jsonBody) {
         JSONObject jPayload = new JSONObject();
@@ -29,7 +32,7 @@ public class NotificationManager {
             jNotification.put("body", jsonBody.getText());
             jNotification.put("sound", "default");
             jNotification.put("icon", "ic_launcher");
-            jData.put("picture", jsonBody.getData());
+            jData.put("picture_url", jsonBody.getData());
 
 //            jNotification.put("badge", "1");
 //            jNotification.put("click_action", "OPEN_ACTIVITY_1");
@@ -74,8 +77,8 @@ public class NotificationManager {
             return resp;
 
         } catch (JSONException | IOException e) {
-            e.printStackTrace();
-            return e.getMessage();
+            Log.d(TAG,"Send Notification Error " + e.toString());
+            return e.toString();
         }
     }
 
@@ -88,7 +91,7 @@ public class NotificationManager {
         private String topic;
         private String title;
         private String text;
-        private File data;
+        private String data;
 
         public JsonBody() {
         }
@@ -117,11 +120,11 @@ public class NotificationManager {
             this.text = text;
         }
 
-        public File getData() {
+        public String getData() {
             return data;
         }
 
-        public void setData(File data) {
+        public void setData(String data) {
             this.data = data;
         }
     }
